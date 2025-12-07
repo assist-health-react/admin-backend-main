@@ -80,7 +80,12 @@ const MedicalHistorySchema = new Schema({
     provider: String,
     policyNumber: String,
     expiryDate: Date
-  }]
+  }],
+  primaryCarePhysician: {
+  name: String,
+  contactNumber: String
+},
+
 }, { timestamps: true });
 
 // Add indexes

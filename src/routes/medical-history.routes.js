@@ -8,4 +8,4 @@ router.get('/:memberId', /**authenticate, */ medicalHistoryController.getAll);
 router.patch('/:memberId', /**authenticate, */ medicalHistoryController.updatebyId);
 router.delete('/:memberId', /**authenticate, */ medicalHistoryController.deletebyId);
 
-module.exports = router; 
+module.exports = router;  

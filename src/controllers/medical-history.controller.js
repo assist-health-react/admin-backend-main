@@ -237,7 +237,8 @@ class MedicalHistoryController {
     try {
       const { memberId } = req.params;
       const medicalHistoryId = req.query.id;
-
+      console.log(medicalHistoryId);
+      
       let medicalHistory;
 
       if (medicalHistoryId) {
@@ -285,73 +286,133 @@ class MedicalHistoryController {
   /**
    * Update medical history (partial updates supported)
    */
+  // async updatebyId(req, res) {
+  //   try {
+  //     const { memberId } = req.params;
+  //     const medicalHistoryId = req.query.id;
+  //     if(!medicalHistoryId){
+  //       return res.status(400).json({
+  //         status: 'error',
+  //         message: 'Medical history ID is required'
+  //       });
+  //     }
+
+  //     console.log(req.body.primaryCarePhysician)
+  //     console.log(req.body.primaryCarePhysician.name)
+
+  //     // Parse allergies if it's a string
+  //     if (req.body.allergies && typeof req.body.allergies === 'string') {
+  //       try {
+  //         req.body.allergies = JSON.parse(req.body.allergies);
+  //       } catch (parseError) {
+  //         return res.status(400).json({
+  //           status: 'error',
+  //           message: 'Invalid allergies format. Expected JSON array.'
+  //         });
+  //       }
+  //     }
+
+  //     // Validate the request body according to model schema
+  //     /*const validationErrors = this.validateMedicalHistoryData(req.body);
+  //     if (validationErrors.length > 0) {
+  //       return res.status(400).json({
+  //         status: 'error',
+  //         message: 'Validation failed',
+  //         errors: validationErrors
+  //       });
+  //     }*/
+
+  //     // Check if medical history exists before updating (since upsert is false)
+  //     const existingMedicalHistory = await MedicalHistory.findOne({ memberId, _id: new mongoose.Types.ObjectId(medicalHistoryId) });
+  //     if (!existingMedicalHistory) {
+  //       return res.status(404).json({
+  //         status: 'error',
+  //         message: 'Medical history not found. Cannot create new medical history through update.'
+  //       });
+  //     }
+
+  //     // const medicalHistory = await MedicalHistory.findOneAndUpdate(
+  //     //   { memberId: req.params.memberId },
+  //     //   { $set: req.body },
+  //     //   { new: true, runValidators: true, upsert: false }
+  //     // );
+  //     const medicalHistory = await MedicalHistory.findOneAndUpdate(
+  //       { 
+  //         memberId: req.params.memberId, 
+  //         _id: new mongoose.Types.ObjectId(medicalHistoryId) 
+  //       },
+  //       { $set: req.body },
+  //       { new: true, runValidators: true, upsert: false }
+  //     );
+
+
+  //     if (!medicalHistory) {
+  //       return res.status(404).json({
+  //         status: 'error',
+  //         message: 'Medical history not found'
+  //       });
+  //     }
+
+  //     res.json({
+  //       status: 'success',
+  //       data: medicalHistory
+  //     });
+  //   } catch (error) {
+  //     logger.error('Update medical history error:', error);
+  //     res.status(400).json({
+  //       status: 'error',
+  //       message: error.message
+  //     });
+  //   }
+  // }
   async updatebyId(req, res) {
-    try {
-      const { memberId } = req.params;
-      const medicalHistoryId = req.query.id;
-      if(!medicalHistoryId){
-        return res.status(400).json({
-          status: 'error',
-          message: 'Medical history ID is required'
-        });
-      }
+  try {
+    const { memberId } = req.params;
+    const medicalHistoryId = req.query.id;
 
-      // Parse allergies if it's a string
-      if (req.body.allergies && typeof req.body.allergies === 'string') {
-        try {
-          req.body.allergies = JSON.parse(req.body.allergies);
-        } catch (parseError) {
-          return res.status(400).json({
-            status: 'error',
-            message: 'Invalid allergies format. Expected JSON array.'
-          });
-        }
-      }
-
-      // Validate the request body according to model schema
-      /*const validationErrors = this.validateMedicalHistoryData(req.body);
-      if (validationErrors.length > 0) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Validation failed',
-          errors: validationErrors
-        });
-      }*/
-
-      // Check if medical history exists before updating (since upsert is false)
-      const existingMedicalHistory = await MedicalHistory.findOne({ memberId, _id: new mongoose.Types.ObjectId(medicalHistoryId) });
-      if (!existingMedicalHistory) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Medical history not found. Cannot create new medical history through update.'
-        });
-      }
-
-      const medicalHistory = await MedicalHistory.findOneAndUpdate(
-        { memberId: req.params.memberId },
-        { $set: req.body },
-        { new: true, runValidators: true, upsert: false }
-      );
-
-      if (!medicalHistory) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Medical history not found'
-        });
-      }
-
-      res.json({
-        status: 'success',
-        data: medicalHistory
-      });
-    } catch (error) {
-      logger.error('Update medical history error:', error);
-      res.status(400).json({
+    if (!medicalHistoryId) {
+      return res.status(400).json({
         status: 'error',
-        message: error.message
+        message: 'Medical history ID is required'
       });
     }
+
+    // Check existing
+    const existingMedicalHistory = await MedicalHistory.findOne({
+      memberId,
+      _id: new mongoose.Types.ObjectId(medicalHistoryId)
+    });
+
+    if (!existingMedicalHistory) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Medical history not found'
+      });
+    }
+
+    // Correct update query
+    const medicalHistory = await MedicalHistory.findOneAndUpdate(
+      { 
+        memberId,
+        _id: new mongoose.Types.ObjectId(medicalHistoryId)
+      },
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      status: 'success',
+      data: medicalHistory
+    });
+
+  } catch (error) {
+    return res.status(400).json({
+      status: 'error',
+      message: error.message
+    });
   }
+}
+
 
   /**
    * Delete medical history

@@ -16,23 +16,74 @@ cloudinary.config({
 });
 
 // ✅ Configure Cloudinary Storage for Multer
+// const storage = new CloudinaryStorage({
+//   cloudinary,
+//   params: async (req, file) => {
+//     // generate unique filename
+//     const timestamp = Date.now();
+//     const randomString = crypto.randomBytes(8).toString('hex');
+//     const extension = path.extname(file.originalname).replace('.', '');
+//     const filename = `${timestamp}-${randomString}.${extension}`;
+
+//     return {
+//       folder: 'assisthealth/uploads', // You can change folder name
+//       public_id: filename,
+//       resource_type: 'auto', // auto-detect (image, video, pdf, etc.)
+//       allowed_formats: ['jpg', 'png', 'jpeg', 'gif', 'webp', 'svg', 'pdf', 'xlsx', 'csv', 'txt']
+//     };
+//   },
+// });
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
-    // generate unique filename
-    const timestamp = Date.now();
-    const randomString = crypto.randomBytes(8).toString('hex');
-    const extension = path.extname(file.originalname).replace('.', '');
-    const filename = `${timestamp}-${randomString}.${extension}`;
+
+    const originalName = path.parse(file.originalname).name;   // filename without extension
+    const extension = path.extname(file.originalname).replace('.', ''); // extension only
 
     return {
-      folder: 'assisthealth/uploads', // You can change folder name
-      public_id: filename,
-      resource_type: 'auto', // auto-detect (image, video, pdf, etc.)
-      allowed_formats: ['jpg', 'png', 'jpeg', 'gif', 'webp', 'svg', 'pdf', 'xlsx', 'csv', 'txt']
+      folder: 'assisthealth/uploads',
+
+      // Keep original filename WITH extension
+      public_id: `${originalName}.${extension}`,
+
+      // PDF must be uploaded as RAW
+      resource_type: file.mimetype === "application/pdf"
+        ? "raw"
+        : "auto",
+
+      access_mode: 'public',
+
+      allowed_formats: [
+        'jpg', 'png', 'jpeg', 'gif', 'webp', 'svg',
+        'pdf', 'xlsx', 'csv', 'txt'
+      ]
     };
   },
 });
+
+
+// const storage = new CloudinaryStorage({
+//   cloudinary,
+//   params: async (req, file) => {
+//     const timestamp = Date.now();
+//     const randomString = crypto.randomBytes(8).toString('hex');
+//     const extension = path.extname(file.originalname).replace('.', '');
+//     const filename = `${timestamp}-${randomString}.${extension}`;
+
+//     return {
+//       folder: 'assisthealth/uploads',
+//       public_id: filename,
+//       resource_type: file.mimetype === "application/pdf" ? "raw" : "auto",  // ⬅️ Important
+//       access_mode: 'public',
+//       allowed_formats: [
+//         'jpg', 'png', 'jpeg', 'gif', 'webp', 'svg',
+//         'pdf', 'xlsx', 'csv', 'txt'
+//       ]
+//     };
+//   },
+// });
+
+
 
 // ✅ Multer setup with limits and filters
 const upload = multer({
