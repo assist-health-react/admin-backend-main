@@ -2,32 +2,36 @@ const mongoose = require("mongoose");
 
 const coverageAddressSchema = new mongoose.Schema({
   locationName: { type: String, required: true },
-  addressStreet: { type: String, required: true },
-  area: { type: String, required: true },
+  street: { type: String, required: true },        // renamed
+  region: { type: String, required: true },        // was area
   city: { type: String, required: true },
+  state: { type: String, required: true },         // added
+  country: { type: String, default: "India" },     // added
   pincode: { type: String, required: true },
 });
 
 const homecareSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true },
-    phone: { type: String, required: true }, // stored as +91XXXXXXXXXX
+    email: { type: String },
+    phone: { type: String },
 
     servicetype: {
       type: String,
       enum: ["Home Visit", "Centre", "Both"],
-      required: true,
+      required: true
     },
 
     website: { type: String, default: "" },
 
+    // Main Address (Centre)
     address: {
-      street: { type: String, required: true },
-      area: { type: String, required: true },
-      city: { type: String, required: true },
+      street: { type: String },
+      region: { type: String },    // changed from area
+      city: { type: String },
       state: { type: String },
       pincode: { type: String, required: true },
+      country: { type: String, default: "India" },
     },
 
     gstNumber: { type: String, default: "" },
@@ -40,6 +44,7 @@ const homecareSchema = new mongoose.Schema(
 
     introduction: { type: String, default: "" },
 
+    // MULTIPLE HOMECARE LOCATIONS
     addresses: {
       type: [coverageAddressSchema],
       default: [],

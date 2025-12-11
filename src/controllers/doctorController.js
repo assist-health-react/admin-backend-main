@@ -17,15 +17,47 @@ exports.getSpecialties = async (req, res) => {
 // =============================
 // SUB-SPECIALTIES
 // =============================
+// exports.getSubSpecialties = async (req, res) => {
+//   try {
+//     console.log(req.params.specialtyId);
+    
+//     const data = await SubSpecialty.find({
+//       specialtyId: req.params.specialtyId
+//     }).sort({ name: 1 });
+//     console.log(data)
+
+//     res.json({ status: "success", data });
+//   } catch (e) {
+//     res.status(500).json({ status: "error", message: "Failed to fetch sub-specialties" });
+//   }
+// };
+
+// =========== 9.12.25==================
 exports.getSubSpecialties = async (req, res) => {
   try {
-    const data = await SubSpecialty.find({
-      specialtyId: req.params.specialtyId
+    const { specialtyId } = req.params;
+
+    // Find specialty by name first
+    const specialty = await Specialty.findOne({ name: specialtyId });
+
+    if (!specialty) {
+      return res.status(404).json({
+        status: "error",
+        message: "Specialty not found"
+      });
+    }
+
+    // Now fetch sub-specialties using actual ID
+    const subs = await SubSpecialty.find({
+      specialtyId: specialty._id
     }).sort({ name: 1 });
 
-    res.json({ status: "success", data });
+    return res.json({ status: "success", data: subs });
   } catch (e) {
-    res.status(500).json({ status: "error", message: "Failed to fetch sub-specialties" });
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to fetch sub-specialties"
+    });
   }
 };
 
