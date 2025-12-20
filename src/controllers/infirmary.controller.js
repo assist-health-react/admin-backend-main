@@ -4,14 +4,41 @@ const mongoose = require('mongoose');
 
 exports.createVisit = async (req, res) => {
   try {
+    const existing = await Infirmary.findOne({
+      studentId: req.body.studentId,
+      date: new Date(req.body.date)
+    });
+
+    if (existing) {
+      return res.status(400).json({
+        message: "Infirmary record already exists for today"
+      });
+    }
     const visit = await Infirmary.create(req.body);
-    console.log(`visit: ${JSON.stringify(visit)}`);
-    console.log(`req.body.medicineProvided: ${JSON.stringify(req.body.medicineProvided)}`);
+   // console.log(`visit: ${JSON.stringify(visit)}`);
+   // console.log(`req.body.medicineProvided: ${JSON.stringify(req.body.medicineProvided)}`);
     //update inventory stock
-    const inventory = await Inventory.findById(req.body.medicineProvided.inventoryId);
-    inventory.current_stock -= req.body.medicineProvided.quantity;
-    console.log(`inventory: ${JSON.stringify(inventory)}`);
-    await inventory.save();
+  //   const inventory = await Inventory.findById(req.body.medicineProvided.inventoryId);
+  //   inventory.current_stock -= req.body.medicineProvided.quantity;
+  //  // console.log(`inventory: ${JSON.stringify(inventory)}`);
+  //   await inventory.save();
+     if (req.body.medicineProvided?.inventoryId) {
+        const inventory = await Inventory.findById(
+          req.body.medicineProvided.inventoryId
+        );
+
+        if (!inventory) {
+          return res.status(400).json({ message: "Medicine not found" });
+        }
+
+        if (inventory.current_stock < req.body.medicineProvided.quantity) {
+          return res.status(400).json({ message: "Insufficient stock" });
+        }
+
+        inventory.current_stock -= req.body.medicineProvided.quantity;
+        await inventory.save();
+      }
+
 
     res.status(201).json({
       message: 'success',
@@ -214,7 +241,7 @@ exports.getVisits = async (req, res) => {
 exports.getVisitById = async (req, res) => {
   try {
     const visit = await Infirmary.findById(req.params.id)
-    .populate('medicineProvided.inventoryId', 'item_name');
+   // .populate('medicineProvided.inventoryId', 'item_name');
     res.status(200).json({
       message: 'success',
       data: visit
@@ -227,23 +254,69 @@ exports.getVisitById = async (req, res) => {
     });
   }
 };
-
 exports.updateVisit = async (req, res) => {
   try {
-    const visit = await Infirmary.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
-    });
-    if (!visit) {
+    // 1️⃣ Find existing visit
+    const existingVisit = await Infirmary.findById(req.params.id);
+
+    if (!existingVisit) {
       return res.status(404).json({
         message: 'error',
         error: 'Visit not found'
       });
     }
+
+    // 2️⃣ Restore OLD inventory stock (if medicine was given earlier)
+    if (existingVisit.medicineProvided?.inventoryId) {
+      const oldInventory = await Inventory.findById(
+        existingVisit.medicineProvided.inventoryId
+      );
+
+      if (oldInventory) {
+        oldInventory.current_stock += existingVisit.medicineProvided.quantity;
+        await oldInventory.save();
+      }
+    }
+
+    // 3️⃣ Deduct NEW inventory stock (if medicine provided now)
+    if (req.body.medicineProvided?.inventoryId) {
+      const newInventory = await Inventory.findById(
+        req.body.medicineProvided.inventoryId
+      );
+
+      if (!newInventory) {
+        return res.status(400).json({
+          message: 'error',
+          error: 'Medicine not found'
+        });
+      }
+
+      if (newInventory.current_stock < req.body.medicineProvided.quantity) {
+        return res.status(400).json({
+          message: 'error',
+          error: 'Insufficient stock'
+        });
+      }
+
+      newInventory.current_stock -= req.body.medicineProvided.quantity;
+      await newInventory.save();
+    }
+
+    // 4️⃣ Update infirmary visit
+    const visit = await Infirmary.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+
     res.status(200).json({
       message: 'success',
       data: visit
     });
+
   } catch (error) {
     logger.error('Error updating infirmary visit:', error);
     res.status(400).json({
@@ -252,6 +325,31 @@ exports.updateVisit = async (req, res) => {
     });
   }
 };
+
+// exports.updateVisit = async (req, res) => {
+//   try {
+//     const visit = await Infirmary.findByIdAndUpdate(req.params.id, req.body, {
+//       new: true,
+//       runValidators: true
+//     });
+//     if (!visit) {
+//       return res.status(404).json({
+//         message: 'error',
+//         error: 'Visit not found'
+//       });
+//     }
+//     res.status(200).json({
+//       message: 'success',
+//       data: visit
+//     });
+//   } catch (error) {
+//     logger.error('Error updating infirmary visit:', error);
+//     res.status(400).json({
+//       message: 'error',
+//       error: error.message
+//     });
+//   }
+// };
 
 exports.deleteVisit = async (req, res) => {
   try {
@@ -268,6 +366,37 @@ exports.deleteVisit = async (req, res) => {
     });
   } catch (error) {
     logger.error('Error deleting infirmary visit:', error);
+    res.status(500).json({
+      message: 'error',
+      error: error.message
+    });
+  }
+};
+
+exports.getVisitsByStudent = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    if (!studentId) {
+      return res.status(400).json({
+        message: 'error',
+        error: 'Student ID is required'
+      });
+    }
+
+    const visits = await Infirmary.find({ studentId })
+      .sort({ date: -1, createdAt: -1 })
+      .populate('studentId', 'name memberId studentDetails.grade studentDetails.section')
+    //  .populate('nurseId', 'name nurseId')
+   //   .populate('medicineProvided.inventoryId', 'item_name');
+
+    res.status(200).json({
+      message: 'success',
+      data: visits
+    });
+
+  } catch (error) {
+    logger.error('Error fetching student infirmary history:', error);
     res.status(500).json({
       message: 'error',
       error: error.message

@@ -136,6 +136,7 @@ class AssessmentController {
   try {
     const { studentId } = req.body;
 
+    // 1️⃣ Validate student
     const student = await Student.findById(studentId);
     if (!student || !student.active) {
       return res.status(404).json({
@@ -144,6 +145,7 @@ class AssessmentController {
       });
     }
 
+    // 2️⃣ Get school (by school code)
     const school = await School.findOne({
       schoolId: student.studentDetails.schoolId
     });
@@ -155,37 +157,50 @@ class AssessmentController {
       });
     }
 
+    // 3️⃣ Create assessment
     const assessment = await Assessment.create({
       studentId: student._id,
       schoolId: school._id,
       name: student.name,
+      dob: student.dob,
 
-      heightInCm: req.body.heightInCm || null,
-      weightInKg: req.body.weightInKg || null,
-      bmi: req.body.bmi || null,
-      temperatureInCelsius: req.body.temperatureInCelsius || null,
-      temperatureInFahrenheit: req.body.temperatureInFahrenheit || null,
-      pulseRateBpm: req.body.pulseRateBpm || null,
-      spo2Percentage: req.body.spo2Percentage || null,
-      bp: req.body.bp || null,
-      oralHealth: req.body.oralHealth || null,
-      dentalIssues: req.body.dentalIssues || null,
-      visionLeft: req.body.visionLeft || null,
-      visionRight: req.body.visionRight || null,
-      visionComments: req.body.visionComments || null,
-      hearingComments: req.body.hearingComments || null,
-      additionalComments: req.body.additionalComments || null,
-      doctorSignature: req.body.doctorSignature || null,
-      nurseSignature: req.body.nurseSignature || null,
-      guardianSignature: req.body.guardianSignature || null,
-
-      // 👇 future use
-      pdfUrl: null
+      heightInCm: req.body.heightInCm,
+      weightInKg: req.body.weightInKg,
+      bmi: req.body.bmi,
+      temperatureInCelsius: req.body.temperatureInCelsius,
+      temperatureInFahrenheit: req.body.temperatureInFahrenheit,
+      pulseRateBpm: req.body.pulseRateBpm,
+      spo2Percentage: req.body.spo2Percentage,
+      bp: req.body.bp,
+      oralHealth: req.body.oralHealth,
+      dentalIssues: req.body.dentalIssues,
+      visionLeft: req.body.visionLeft,
+      visionRight: req.body.visionRight,
+      visionComments: req.body.visionComments,
+      hearingComments: req.body.hearingComments,
+      additionalComments: req.body.additionalComments,
+      doctorSignature: req.body.doctorSignature,
+      nurseSignature: req.body.nurseSignature,
+      guardianSignature: req.body.guardianSignature
     });
 
+    // 4️⃣ (OPTIONAL) Generate PDF locally
+    // ⚠️ Make sure pdfService does NOT use res
+    const pdfPath = await pdfService.generateAssessmentPdf(assessment);
+
+    // 5️⃣ Upload PDF to Cloudinary (SCHOOL ONLY)
+    const uploadResult = await cloudinary.uploader.upload(pdfPath, {
+      resource_type: 'raw',
+      folder: `assisthealth/assessments/${school.schoolId}`
+    });
+
+    // 6️⃣ Save PDF URL
+    assessment.pdfUrl = uploadResult.secure_url;
+    await assessment.save();
+
+    // 7️⃣ SEND RESPONSE (LAST STEP)
     return res.status(201).json({
       status: 'success',
-      message: 'Assessment created successfully',
       data: assessment
     });
 
@@ -198,91 +213,6 @@ class AssessmentController {
   }
 }
 
-  //new
-//   async createAssessment(req, res) {
-//   try {
-//     const { studentId } = req.body;
-
-//     // 1️⃣ Validate student
-//     const student = await Student.findById(studentId);
-//     if (!student || !student.active) {
-//       return res.status(404).json({
-//         status: 'error',
-//         message: 'Student not found or inactive'
-//       });
-//     }
-
-//     // 2️⃣ Get school (by school code)
-//     const school = await School.findOne({
-//       schoolId: student.studentDetails.schoolId
-//     });
-
-//     if (!school) {
-//       return res.status(404).json({
-//         status: 'error',
-//         message: 'School not found'
-//       });
-//     }
-
-//     // 3️⃣ Create assessment
-//     const assessment = await Assessment.create({
-//       studentId: student._id,
-//       schoolId: school._id,
-//       name: student.name,
-//       dob: student.dob,
-
-//       heightInCm: req.body.heightInCm,
-//       weightInKg: req.body.weightInKg,
-//       bmi: req.body.bmi,
-//       temperatureInCelsius: req.body.temperatureInCelsius,
-//       temperatureInFahrenheit: req.body.temperatureInFahrenheit,
-//       pulseRateBpm: req.body.pulseRateBpm,
-//       spo2Percentage: req.body.spo2Percentage,
-//       bp: req.body.bp,
-//       oralHealth: req.body.oralHealth,
-//       dentalIssues: req.body.dentalIssues,
-//       visionLeft: req.body.visionLeft,
-//       visionRight: req.body.visionRight,
-//       visionComments: req.body.visionComments,
-//       hearingComments: req.body.hearingComments,
-//       additionalComments: req.body.additionalComments,
-//       doctorSignature: req.body.doctorSignature,
-//       nurseSignature: req.body.nurseSignature,
-//       guardianSignature: req.body.guardianSignature
-//     });
-//      console.log("***********")
-//      console.log(student)
-     
-//      console.log("***********")
-//     // 4️⃣ (OPTIONAL) Generate PDF locally
-//     // ⚠️ Make sure pdfService does NOT use res
-//     const pdfPath = await pdfService.generateAssessmentPdf(assessment);
-
-//     // 5️⃣ Upload PDF to Cloudinary (SCHOOL ONLY)
-//     const uploadResult = await cloudinary.uploader.upload(pdfPath, {
-//       resource_type: 'raw',
-//       folder: `assisthealth/assessments/${school.schoolId}`
-//     });
-
-//     // 6️⃣ Save PDF URL
-//     assessment.pdfUrl = uploadResult.secure_url;
-//     await assessment.save();
-
-//     // 7️⃣ SEND RESPONSE (LAST STEP)
-//     return res.status(201).json({
-//       status: 'success',
-//       data: assessment
-//     });
-
-//   } catch (error) {
-//     console.error('Create assessment error:', error);
-//     return res.status(500).json({
-//       status: 'error',
-//       message: error.message
-//     });
-//   }
-// }
-//old
 //   async createAssessment(req, res) {
 //   try {
 //     const { studentId } = req.body;
@@ -1013,51 +943,6 @@ async getAssessmentPdf(req, res) {
       };
     }
   }
-
-  async generateAssessmentPdf(req, res) {
-  try {
-    const { id } = req.params;
-
-    const assessment = await Assessment.findById(id)
-      .populate('studentId', 'name dob gender email studentDetails')
-      .populate('schoolId', 'name');
-
-    if (!assessment) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Assessment not found'
-      });
-    }
-
-    const pdfResult = await pdfService.generateAssessmentPdf(assessment);
-
-    if (!pdfResult?.success) {
-      return res.status(500).json({
-        status: 'error',
-        message: 'PDF generation failed'
-      });
-    }
-
-    await Assessment.findByIdAndUpdate(id, {
-      pdfUrl: pdfResult.pdfUrl
-    });
-
-    return res.json({
-      status: 'success',
-      data: {
-        pdfUrl: pdfResult.pdfUrl
-      }
-    });
-
-  } catch (error) {
-    console.error('Generate PDF error:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: error.message
-    });
-  }
-}
-
 }
 
 module.exports = new AssessmentController(); 

@@ -106,92 +106,128 @@ class PdfService {
     }
   }
 
-  async generateAssessmentPdf(assessment, res) {
-    try {
-      const student = await Member.findById(assessment.studentId);
-      const school = await School.findById(assessment.schoolId);
+//   async generateAssessmentPdf(assessment, res) {
+//     try {
+//       const student = await Member.findById(assessment.studentId);
+//       const school = await School.findById(assessment.schoolId);
 
-      const formData = {
-          studentInfo: {
-              name: assessment.name,
-              assessmentDate: new Date().toISOString().split('T')[0],
-              age: Math.floor((new Date() - new Date(student.dob)) / (365.25 * 24 * 60 * 60 * 1000)),
-              schoolName: student.studentDetails.schoolName,
-              gender: student.gender,
-              grade: student.studentDetails.grade,
-              assistHealthId: student.memberId,
-              section: student.studentDetails.section
-          },
-          vitalSigns: {
-              height: assessment.heightInCm,
-              weight: assessment.weightInKg,
-              bmi: assessment.bmi,
-              temperature: assessment.temperatureInFahrenheit,
-              pulse: assessment.pulseRateBpm,
-              spO2: assessment.spo2Percentage,
-              bp: assessment.bp
-          },
-          vision: {
-              right: assessment.visionLeft,
-              left: assessment.visionRight,
-              comment: assessment.visionComments
-          },
-          hearing: {
-              comments: assessment.hearingComments
-          },
-          oralHealth: {
-              normal: assessment.oralHealth === 'normal',
-              decayed: assessment.oralHealth === 'decayed',
-              dentalStrains: assessment.oralHealth === 'dentalStrains', 
-              crossBite: assessment.oralHealth === 'crossBite',
-              dentures: assessment.oralHealth === 'dentures',
-              otherIssues: assessment.dentalIssues || 'no issues'
-          },
-          additionalComments: assessment.additionalComments,
-          signatures: {
-              nurseSignature: {
-                  path: assessment.nurseSignature,
-                  name: '',
-                  designation: ''
-              },
-              doctorSignature: {
-                  path: assessment.doctorSignature,
-                  name: '',
-                  designation: ''
-              }
-          }
-      }; 
+//       const formData = {
+//           studentInfo: {
+//               name: assessment.name,
+//               assessmentDate: new Date().toISOString().split('T')[0],
+//               age: Math.floor((new Date() - new Date(student.dob)) / (365.25 * 24 * 60 * 60 * 1000)),
+//               schoolName: student.studentDetails.schoolName,
+//               gender: student.gender,
+//               grade: student.studentDetails.grade,
+//               assistHealthId: student.memberId,
+//               section: student.studentDetails.section
+//           },
+//           vitalSigns: {
+//               height: assessment.heightInCm,
+//               weight: assessment.weightInKg,
+//               bmi: assessment.bmi,
+//               temperature: assessment.temperatureInFahrenheit,
+//               pulse: assessment.pulseRateBpm,
+//               spO2: assessment.spo2Percentage,
+//               bp: assessment.bp
+//           },
+//           vision: {
+//               right: assessment.visionLeft,
+//               left: assessment.visionRight,
+//               comment: assessment.visionComments
+//           },
+//           hearing: {
+//               comments: assessment.hearingComments
+//           },
+//           oralHealth: {
+//               normal: assessment.oralHealth === 'normal',
+//               decayed: assessment.oralHealth === 'decayed',
+//               dentalStrains: assessment.oralHealth === 'dentalStrains', 
+//               crossBite: assessment.oralHealth === 'crossBite',
+//               dentures: assessment.oralHealth === 'dentures',
+//               otherIssues: assessment.dentalIssues || 'no issues'
+//           },
+//           additionalComments: assessment.additionalComments,
+//           signatures: {
+//               nurseSignature: {
+//                   path: assessment.nurseSignature,
+//                   name: '',
+//                   designation: ''
+//               },
+//               doctorSignature: {
+//                   path: assessment.doctorSignature,
+//                   name: '',
+//                   designation: ''
+//               }
+//           }
+//       }; 
 
-      return new Promise((resolve, reject) => {
-          res.render('assessment_report', formData, async (err, html) => {
-              if (err) {
-                  console.error('Template Render Error:', err);
-                  reject(err);
-                  return;
-              }
+//       return new Promise((resolve, reject) => {
+//           res.render('assessment_report', formData, async (err, html) => {
+//               if (err) {
+//                   console.error('Template Render Error:', err);
+//                   reject(err);
+//                   return;
+//               }
 
-              try {
-                  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                  const filename = `health-assessment-${formData.studentInfo.name}-${timestamp}.pdf`;
+//               try {
+//                   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+//                   const filename = `health-assessment-${formData.studentInfo.name}-${timestamp}.pdf`;
                   
-                  const { pdfUrl } = await this.generatePDF(html, filename);
+//                   const { pdfUrl } = await this.generatePDF(html, filename);
                   
-                  resolve({
-                      success: true,
-                      message: 'PDF generated successfully', 
-                      s3Url: pdfUrl
-                  });
-              } catch (error) {
-                  console.error('PDF Generation Error:', error);
-                  reject(error);
-              }
-          });
-      });
-    } catch (error) {
-        console.error('Main Route Error:', error);
-        res.status(500).send('Server error: ' + error.message);
+//                   resolve({
+//                       success: true,
+//                       message: 'PDF generated successfully', 
+//                       s3Url: pdfUrl
+//                   });
+//               } catch (error) {
+//                   console.error('PDF Generation Error:', error);
+//                   reject(error);
+//               }
+//           });
+//       });
+//     } catch (error) {
+//         console.error('Main Route Error:', error);
+//         res.status(500).send('Server error: ' + error.message);
+//     }
+//   }
+async generateAssessmentPdf(assessment) {
+  try {
+    const student = assessment.studentId || {};
+    const school = assessment.schoolId || {};
+
+    const dob = student.dob
+      ? new Date(student.dob).toLocaleDateString()
+      : 'N/A';
+
+    let age = 'N/A';
+    if (student.dob) {
+      age = Math.floor(
+        (new Date() - new Date(student.dob)) /
+        (365.25 * 24 * 60 * 60 * 1000)
+      );
     }
+
+    // 🔥 NEVER USE res HERE
+    // 🔥 Only generate PDF and return result
+
+    const pdfUrl = 'TEMP_URL_OR_LOCAL_PATH';
+
+    return {
+      success: true,
+      pdfUrl
+    };
+
+  } catch (error) {
+    console.error('PDF Service Error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
   }
+}
+
 
   async generateAppointmentPdf(appointment, res) {
     try {

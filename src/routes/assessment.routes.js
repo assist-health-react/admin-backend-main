@@ -71,5 +71,10 @@ router.post('/pdf',
 router.post('/bulk-upload',
   assessmentController.bulkUploadAssessments
 );
+router.post(
+  '/assessments/:id/generate-pdf',
+  assessmentController.generateAssessmentPdf
+);
+
 
 module.exports = router; 

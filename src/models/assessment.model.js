@@ -2,8 +2,12 @@ const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 const AssessmentSchema = new Schema({
-  studentId: { type: Schema.Types.ObjectId, ref: 'Member', required: true },
+  studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true },//Student //Member
   schoolId: { type: Schema.Types.ObjectId, ref: 'School', required: true },
+  dob: {
+  type: Date,
+  required: false
+},
   name: String,
   heightInFt: Number,
   heightInCm: Number,

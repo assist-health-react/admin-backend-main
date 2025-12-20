@@ -8,5 +8,10 @@ router.get('/', infirmaryController.getVisits);
 router.get('/:id', infirmaryController.getVisitById);
 router.put('/:id', infirmaryController.updateVisit);
 router.delete('/:id', infirmaryController.deleteVisit);
+// Student-wise infirmary history
+router.get(
+  '/student/:studentId',
+  infirmaryController.getVisitsByStudent
+);
 
 module.exports = router; 
