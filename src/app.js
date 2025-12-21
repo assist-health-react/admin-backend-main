@@ -114,6 +114,7 @@ app.use(`${apiVersion}/diagnostics`, require("./routes/diagnosticsRoutes"));
 app.use(`${apiVersion}/physiotherapy`, require("./routes/physiotherapyRoutes"));
 app.use(`${apiVersion}/homecare`, require("./routes/homecareRoutes"));
 app.use(`${apiVersion}/students`,require("./routes/student.routes"));
+app.use(`${apiVersion}/test`,require("./routes/test.routes"));
 
 // Health check endpoint
 app.get('/health', (req, res) => {

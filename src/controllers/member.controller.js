@@ -2,11 +2,11 @@ const { Member, AuthCredential, Doctor, Nurse, Navigator, MedicalHistory } = req
 const { logger } = require('../utils/logger');
 const csv = require('csv-parse');
 const fs = require('fs');
-const emailService = require('../utils/email');
+const email = require('../utils/email');
 const mongoose = require('mongoose');
 const path = require('path');
 const pdfService = require('../utils/pdfService');
-
+const emailService = require('../utils/emailService');
 class MemberController {
   /**
    * Create new member
@@ -658,6 +658,8 @@ class MemberController {
           message: 'One or more members not found'
         });
       }
+       //21.12.25
+       const assignedMembers = [];
 
       for (const member of members) {
         member.healthcareTeam.navigator = {
@@ -666,6 +668,12 @@ class MemberController {
           assignedDate: new Date()
         };
         await member.save();
+          //21.12.25
+           assignedMembers.push({
+            name: member.name,
+            email: member.email,
+            phone: member.phone
+          });
       }
 
       // Update total_assigned_members count
@@ -678,6 +686,25 @@ class MemberController {
       });
 
       res.json({ status: 'success', message: 'Navigators assigned successfully' });
+        //21.12.25
+        // 🔥 background email (non-blocking)
+          for (const member of assignedMembers) {
+            emailService
+              .sendAssignMemberMail({
+                toEmail: navigator.email,
+                toName: navigator.name,
+                memberName: member.name,
+                memberEmail: member.email,
+                memberPhone: member.phone
+              })
+              .then(() => {
+                console.log(`📧 Mail sent for member: ${member.name}`);
+              })
+              .catch(err => {
+                console.error(`📧 Mail failed for ${member.name}:`, err.message);
+              });
+          }
+
     } catch (error) {
       logger.error('Assign navigator error:', error);
       res.status(500).json({
@@ -687,70 +714,166 @@ class MemberController {
       });
     }
   }
+async assignDoctor(req, res) {
+  try {
+    const { memberIds, doctorId } = req.body;
 
-  async assignDoctor(req, res) {
-    try {
-      const { memberIds, doctorId } = req.body;
-      
-      // Validate memberIds and doctorId
-      if (!Array.isArray(memberIds) || !memberIds.length) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Member IDs are required'
-        });
-      }
-
-      if (!doctorId) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Doctor ID is required'
-        });
-      }
-
-      const doctor = await Doctor.findById(doctorId);
-      if (!doctor) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Doctor not found'
-        });
-      }
-
-      const members = await Member.find({ _id: { $in: memberIds } });
-      if (members.length !== memberIds.length) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'One or more members not found'
-        });
-      }
-
-      for (const member of members) {
-        member.healthcareTeam.doctor = {
-          _id: new mongoose.Types.ObjectId(doctorId),
-          name: doctor.name,
-          assignedDate: new Date()
-        };
-        await member.save();
-      }
-
-      // Update total_assigned_members count for doctor
-      const totalMembers = await Member.countDocuments({
-        'healthcareTeam.doctor._id': new mongoose.Types.ObjectId(doctorId)
-      });
-      
-      await Doctor.findByIdAndUpdate(doctorId, {
-        total_assigned_members: totalMembers
-      });
-
-      res.json({ status: 'success', message: 'Doctors assigned successfully' });
-    } catch (error) {
-      logger.error('Assign doctor error:', error);
-      res.status(500).json({
+    // Validate inputs
+    if (!Array.isArray(memberIds) || !memberIds.length) {
+      return res.status(400).json({
         status: 'error',
-        message: 'Error assigning doctor',
-        details: error.message
+        message: 'Member IDs are required'
       });
     }
+
+    if (!doctorId) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Doctor ID is required'
+      });
+    }
+
+    const doctor = await Doctor.findById(doctorId);
+    if (!doctor) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Doctor not found'
+      });
+    }
+
+    const members = await Member.find({ _id: { $in: memberIds } });
+    if (members.length !== memberIds.length) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'One or more members not found'
+      });
+    }
+
+    // 🔹 Track successfully assigned members
+    const assignedMembers = [];
+
+    for (const member of members) {
+      member.healthcareTeam.doctor = {
+        _id: new mongoose.Types.ObjectId(doctorId),
+        name: doctor.name,
+        assignedDate: new Date()
+      };
+
+      await member.save();
+
+      assignedMembers.push({
+        name: member.name,
+        email: member.email,
+        phone: member.phone
+      });
+    }
+
+    // Update doctor assigned count
+    const totalMembers = await Member.countDocuments({
+      'healthcareTeam.doctor._id': new mongoose.Types.ObjectId(doctorId)
+    });
+
+    await Doctor.findByIdAndUpdate(doctorId, {
+      total_assigned_members: totalMembers
+    });
+
+    // ✅ Respond first
+    res.json({
+      status: 'success',
+      message: 'Doctors assigned successfully'
+    });
+
+    // 🔥 Background email (non-blocking & logged)
+    for (const member of assignedMembers) {
+      emailService
+        .sendAssignMemberMail({
+          toEmail: doctor.email,
+          toName: doctor.name,
+          memberName: member.name,
+          memberEmail: member.email,
+          memberPhone: member.phone
+        })
+        .then(info => {
+          console.log(`📧 Doctor mail sent for ${member.name}`, info.messageId);
+        })
+        .catch(err => {
+          console.error(`❌ Doctor mail failed for ${member.name}`, err.message);
+        });
+    }
+
+  } catch (error) {
+    logger.error('Assign doctor error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error assigning doctor',
+      details: error.message
+    });
   }
+}
+
+  // async assignDoctor(req, res) {
+  //   try {
+  //     const { memberIds, doctorId } = req.body;
+      
+  //     // Validate memberIds and doctorId
+  //     if (!Array.isArray(memberIds) || !memberIds.length) {
+  //       return res.status(400).json({
+  //         status: 'error',
+  //         message: 'Member IDs are required'
+  //       });
+  //     }
+
+  //     if (!doctorId) {
+  //       return res.status(400).json({
+  //         status: 'error',
+  //         message: 'Doctor ID is required'
+  //       });
+  //     }
+
+  //     const doctor = await Doctor.findById(doctorId);
+  //     if (!doctor) {
+  //       return res.status(404).json({
+  //         status: 'error',
+  //         message: 'Doctor not found'
+  //       });
+  //     }
+
+  //     const members = await Member.find({ _id: { $in: memberIds } });
+  //     if (members.length !== memberIds.length) {
+  //       return res.status(404).json({
+  //         status: 'error',
+  //         message: 'One or more members not found'
+  //       });
+  //     }
+
+  //     for (const member of members) {
+  //       member.healthcareTeam.doctor = {
+  //         _id: new mongoose.Types.ObjectId(doctorId),
+  //         name: doctor.name,
+  //         assignedDate: new Date()
+  //       };
+  //       await member.save();
+  //     }
+
+  //     // Update total_assigned_members count for doctor
+  //     const totalMembers = await Member.countDocuments({
+  //       'healthcareTeam.doctor._id': new mongoose.Types.ObjectId(doctorId)
+  //     });
+      
+  //     await Doctor.findByIdAndUpdate(doctorId, {
+  //       total_assigned_members: totalMembers
+  //     });
+
+  //     res.json({ status: 'success', message: 'Doctors assigned successfully' });
+  //   } catch (error) {
+  //     logger.error('Assign doctor error:', error);
+  //     res.status(500).json({
+  //       status: 'error',
+  //       message: 'Error assigning doctor',
+  //       details: error.message
+  //     });
+  //   }
+  // }
 
   async assignNurse(req, res) {
     try {
