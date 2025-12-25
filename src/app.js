@@ -81,7 +81,12 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // API Routes
 const apiVersion = '/api/v1';
-
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Assist Health API is running 🚀'
+  });
+});
 app.use(`${apiVersion}/media`, mediaRoutes);
 
 app.use(`${apiVersion}/auth`, authRoutes);
