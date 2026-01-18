@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 const pdfService = require('../utils/pdfService');
 const emailService = require('../utils/emailService');
+const bcrypt = require('bcryptjs');
 class MemberController {
   /**
    * Create new member
@@ -145,33 +146,92 @@ class MemberController {
       console.log('Medical history created for member:', member._id);
 
       //create a auth credential for the navigator
+      // const authCredential = await AuthCredential.create({
+      //   userId: member._id,
+      //   email,
+      //   phoneNumber: phone,
+      //   phone,
+      //   password: null,
+      //   userType: 'member',
+      //   memberId: member.memberId,
+      //   temporaryPassword: {
+      //     password: null,
+      //     expiresAt: null
+      //   },
+      //   isFirstLogin: false,
+      //   passwordResetRequired: true
+      // });
+
+      // await authCredential.save();
+      //15.1.26
+      // STEP 1: Extract birth year
+      let birthYear = null;
+
+      if (dob) {
+        const dobDate = new Date(dob);
+        if (!isNaN(dobDate)) {
+          birthYear = dobDate.getFullYear();
+        }
+      }
+
+      // STEP 2: Generate raw password
+      const rawPassword = birthYear
+        ? `${member.memberId}@${birthYear}`
+        : `${member.memberId}`;
+
+      console.log(rawPassword)
+
+      // STEP 3: Hash password
+      const hashedPassword = await bcrypt.hash(rawPassword, 12);
+
+      // STEP 4: Save AuthCredential
       const authCredential = await AuthCredential.create({
         userId: member._id,
-        email,
-        phoneNumber: phone,
-        phone,
-        password: null,
         userType: 'member',
         memberId: member.memberId,
-        temporaryPassword: {
+        email,
+        phoneNumber: phone,
+
+        password: hashedPassword,      // ✅ REAL PASSWORD
+        isFirstLogin: false,             // ✅ FORCE RESET
+        passwordResetRequired: false,    // ✅ FORCE RESET
+
+         temporaryPassword: {
           password: null,
           expiresAt: null
         },
-        isFirstLogin: false,
-        passwordResetRequired: true
       });
 
       await authCredential.save();
-
+        console.log(' authCredential created for member:', authCredential._id);
       //send a welcome email to the member
-      const toObj = {
-        name: name,
-        email: email
-       }
-       emailService.sendEmail('welcome', toObj,{
-        number:phone,
-        name:name
-       });
+      // const toObj = {
+      //   name: name,
+      //   email: email
+      //  }
+      //  emailService.sendEmail('welcome', toObj,{
+      //   number:phone,
+      //   name:name
+      //  });
+
+      //15.1.26
+     var tempPassword = 'test'
+      // after member & auth creation
+        await emailService.sendWelcomeMemberMail({
+          toEmail: email,
+          name,
+          memberId: member.memberId,
+          phone,
+         // tempPassword
+        });
+
+        // admin notification (non-blocking)
+        emailService.sendAdminNewMemberMail({
+          name,
+          email,
+          phone,
+          memberId: member.memberId
+        });
 
       res.status(201).json({
         status: 'success',

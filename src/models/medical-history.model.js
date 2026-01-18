@@ -3,6 +3,16 @@ const { Schema } = mongoose;
 
 const MedicalHistorySchema = new Schema({
   memberId: { type: Schema.Types.ObjectId, ref: 'Member', required: true },
+   medicalHistory: [{
+    condition: String,
+    diagnosisDate: Date,
+    treatment: String,
+    notes: String,
+    status: {
+      type: String,
+      enum: ['active', 'resolved', 'inremission', 'chronic']
+    }
+  }],
   medicalReports: [{
     name: String,
     files: [String]
@@ -39,7 +49,8 @@ const MedicalHistorySchema = new Schema({
     date: Date,
     surgeonName: String
   }],
-  previousMedicalConditions: [{
+  //previousMedicalConditions: [{
+  previousConditions: [{
     condition: String,
     diagnosedAt: Date,
     treatmentReceived: String,

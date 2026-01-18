@@ -1,4 +1,5 @@
 const { AuthCredential, Admin, Member, Doctor, Nurse, Navigator, EmpanelledDoctor, Appointment, Blog } = require('../models/index');
+const Student = require('../models/Student.model');
 const { logger } = require('../utils/logger');
 
 class UserController {
@@ -149,7 +150,7 @@ class UserController {
           const nurses = await Nurse.find({}).countDocuments();
           
           // Updated queries for members, students and subprofiles
-          const students = await Member.find({ isStudent: true }).countDocuments();
+          const students = await Student.find({ isStudent: true }).countDocuments();
           const members = await Member.find({ isMember: true }).countDocuments();
           const subprofiles = await Member.find({ isSubprofile: true }).countDocuments();
           

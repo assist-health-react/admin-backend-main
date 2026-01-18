@@ -51,11 +51,11 @@ class MedicalHistoryController {
     }
 
     // Validate previousMedicalConditions
-    if (data.previousMedicalConditions) {
-      if (!Array.isArray(data.previousMedicalConditions)) {
+    if (data.previousConditions) {
+      if (!Array.isArray(data.previousConditions)) {
         errors.push('previousMedicalConditions must be an array');
       } else {
-        data.previousMedicalConditions.forEach((item, index) => {
+        data.previousConditions.forEach((item, index) => {
           if (item.status && !['active', 'resolved', 'inremission', 'chronic'].includes(item.status)) {
             errors.push(`previousMedicalConditions[${index}].status must be one of: active, resolved, inremission, chronic`);
           }
@@ -176,6 +176,8 @@ class MedicalHistoryController {
           message: 'Member not found'
         });
       }
+
+      console.log("Medical History"+member)
 
       // Parse allergies if it's a string
       if (requestData.allergies && typeof requestData.allergies === 'string') {
@@ -389,6 +391,9 @@ class MedicalHistoryController {
         message: 'Medical history not found'
       });
     }
+    
+    // console.log(req.body)
+    // console.log("---------OKAY--------------------")
 
     // Correct update query
     const medicalHistory = await MedicalHistory.findOneAndUpdate(

@@ -1,7 +1,7 @@
 const { Navigator, Member, Doctor, Appointment, School, AuthCredential } = require('../models/index');
 const { logger } = require('../utils/logger');
 const bcrypt = require('bcryptjs');
-const emailService = require('../utils/email');
+const emailService = require('../utils/emailService');
 const mongoose = require('mongoose');
 const pdfService = require('../utils/pdfService');
 
@@ -60,37 +60,82 @@ class NavigatorController {
       });
 
       //generate and hash temporary password
-      const temporaryPassword = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
-      console.log(`temporary password: ${temporaryPassword}`);
+      // const temporaryPassword = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      // const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
+      // console.log(`temporary password: ${temporaryPassword}`);
 
-      //create a auth credential for the navigator
-      const authCredential = await AuthCredential.create({
-        userId: navigator._id,
-        email,
-        phoneNumber: phone,
-        phone,
-        password: null,
-        userType: 'navigator',
-        temporaryPassword: {
-          password: hashedPassword,
-          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24) // 1 day from now
-        },
-        isFirstLogin: true,
-        passwordResetRequired: true
-      });
+      // //create a auth credential for the navigator
+      // const authCredential = await AuthCredential.create({
+      //   userId: navigator._id,
+      //   email,
+      //   phoneNumber: phone,
+      //   phone,
+      //   password: null,
+      //   userType: 'navigator',
+      //   temporaryPassword: {
+      //     password: hashedPassword,
+      //     expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24) // 1 day from now
+      //   },
+      //   isFirstLogin: true,
+      //   passwordResetRequired: true
+      // });
 
-      await authCredential.save();
+      // await authCredential.save();
 
       //send a welcome email to the navigator with the temporary password
-       const toObj = {
-        name: name,
-        email: email
-       }
-       console.log(temporaryPassword);
-       emailService.sendEmail('welcome_password', toObj, {
-        temporaryPassword: temporaryPassword  // Send the plain temporary password, not the hashed one
-       });
+      //  const toObj = {
+      //   name: name,
+      //   email: email
+      //  }
+      //  console.log(temporaryPassword);
+      //  emailService.sendEmail('welcome_password', toObj, {
+      //   temporaryPassword: temporaryPassword  // Send the plain temporary password, not the hashed one
+      //  }); 
+
+      //17.1.26
+
+      // after navigator is created
+        const rawName = name.replace(/\s+/g, "");          // remove spaces
+        const namePart = rawName.substring(0, 4).toUpperCase();
+
+        // extract birth year
+        let birthYear = "";
+        if (dob) {
+          const dobDate = new Date(dob);
+          if (!isNaN(dobDate)) {
+            birthYear = dobDate.getFullYear().toString();
+          }
+        }
+
+        // generate password
+        const rawPassword = birthYear
+          ? `${namePart}@${birthYear}`
+          : `${namePart}@`;
+
+        const hashedPassword = await bcrypt.hash(rawPassword, 12);
+
+        // create auth credential
+        const authCredential = await AuthCredential.create({
+          userId: navigator._id,
+          email,
+          phoneNumber: phone,
+          userType: "navigator",
+
+          password: hashedPassword,          // ✅ real password
+          isFirstLogin: false,                 // ✅ force reset
+          passwordResetRequired: false         // ✅ force reset
+
+          // ❌ DO NOT SET temporaryPassword
+        });
+
+        await authCredential.save();
+
+       // 🔹 NEW: Navigator Welcome Mail
+        await emailService.sendWelcomeNavigatorMail({
+          toEmail: email,
+          name,
+          phone
+        });
 
 
       res.status(201).json({

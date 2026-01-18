@@ -17,7 +17,8 @@ const DoctorSchema = new Schema({
     type: String,
     enum: ['male', 'female', 'other']
   },
-  specializations: [String],
+  //specializations: [String],
+  specializations: [{ type: Schema.Types.ObjectId, ref: 'AhSpecialty' }],
   qualification: [String],
   medicalCouncilRegistrationNumber: { type: String, required: true },
   experienceYears: Number,

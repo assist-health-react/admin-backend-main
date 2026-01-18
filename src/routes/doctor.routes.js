@@ -4,7 +4,7 @@ const doctorController = require('../controllers/doctor.controller');
 const auth = require('../middlewares/auth');
 const { body } = require('express-validator');
 const validate = require('../middlewares/validate');
-
+const AhSpecialty = require('../models/ah-specialty.model');//2026
 // Validation schemas
 const createDoctorValidation = [
   body('name').trim().notEmpty().withMessage('Name is required'),
@@ -27,6 +27,23 @@ const updateDoctorValidation = [
 
   body('isActive').optional().isBoolean().withMessage('isActive must be a boolean')
 ];
+// ================= 2026 =================
+// ================= DOCTOR SPECIALTIES MASTER =================
+router.get(
+  '/specialties',
+  auth.protect(['admin', 'doctor', 'navigator']),
+  async (req, res) => {
+    try {
+      const list = await AhSpecialty.find().sort({ name: 1 });
+      res.json({ status: 'success', data: list });
+    } catch (err) {
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to fetch specialties'
+      });
+    }
+  }
+);
 
 // Protected routes with role-based access
 router.get(

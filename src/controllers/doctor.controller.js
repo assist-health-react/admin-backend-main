@@ -1,8 +1,10 @@
 const { Doctor, Appointment, Member, Navigator, AuthCredential } = require('../models');
 const { logger } = require('../utils/logger');
-const emailService = require('../utils/email');
+const emailService = require('../utils/emailService');
 const mongoose = require('mongoose');
 const pdfService = require('../utils/pdfService');
+const bcrypt = require("bcryptjs");
+const AhSpecialty = require('../models/ah-specialty.model');//2026
 
 class DoctorController {
   constructor() {
@@ -52,135 +54,353 @@ class DoctorController {
   /**
    * Create new doctor
    */
-  async createDoctor(req, res) {
-    try {
-      const {
-        name,
-        email,
-        phone,
-        profilePic,
-        digitalSignature,
-        gender,
-        specializations = [],
-        qualification = [],
-        medicalCouncilRegistrationNumber,
-        experienceYears = 0,
-        languagesSpoken = [],
-        serviceTypes = ['online'],
-        introduction = '',
-        onlineConsultationTimeSlots = [],
-        offlineConsultationTimeSlots = [],
-        offlineAddress = {},
-        areas = []
-      } = req.body;
+  // async createDoctor(req, res) {
+  //   try {
+  //     const {
+  //       name,
+  //       email,
+  //       phone,
+  //       profilePic,
+  //       digitalSignature,
+  //       gender,
+  //       specializations = [],
+  //       qualification = [],
+  //       medicalCouncilRegistrationNumber,
+  //       experienceYears = 0,
+  //       languagesSpoken = [],
+  //       serviceTypes = ['online'],
+  //       introduction = '',
+  //       onlineConsultationTimeSlots = [],
+  //       offlineConsultationTimeSlots = [],
+  //       offlineAddress = {},
+  //       areas = []
+  //     } = req.body;
 
-      // Validate required fields
-      if (!name || !email || !phone || !medicalCouncilRegistrationNumber) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Name, email, phone, and medical council registration number are required'
-        });
-      }
+  //     // Validate required fields
+  //     if (!name || !email || !phone || !medicalCouncilRegistrationNumber) {
+  //       return res.status(400).json({
+  //         status: 'error',
+  //         message: 'Name, email, phone, and medical council registration number are required'
+  //       });
+  //     }
 
-      // Validate gender enum
-      if (gender && !['male', 'female', 'other'].includes(gender)) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Invalid gender value. Must be male, female, or other'
-        });
-      }
+  //     // Validate gender enum
+  //     if (gender && !['male', 'female', 'other'].includes(gender)) {
+  //       return res.status(400).json({
+  //         status: 'error',
+  //         message: 'Invalid gender value. Must be male, female, or other'
+  //       });
+  //     }
 
-      // Check if doctor already exists
-      const existingDoctor = await Doctor.findOne({
-        $or: [{ email }, { phone }]
-      });
+  //     // Check if doctor already exists
+  //     const existingDoctor = await Doctor.findOne({
+  //       $or: [{ email }, { phone }]
+  //     });
 
-      if (existingDoctor) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Doctor already exists with this email or phone'
-        });
-      }
+  //     if (existingDoctor) {
+  //       return res.status(400).json({
+  //         status: 'error',
+  //         message: 'Doctor already exists with this email or phone'
+  //       });
+  //     }
 
-      const existingAuthCredential = await AuthCredential.findOne({
-        $or: [{ email }, { phone }]
-      });
+  //     const existingAuthCredential = await AuthCredential.findOne({
+  //       $or: [{ email }, { phone }]
+  //     });
 
-      if (existingAuthCredential) {
-        return res.status(400).json({
-          status: 'error',
-          message: `${existingAuthCredential.userType} already exists with this email or phone`
-        });
-      }
+  //     if (existingAuthCredential) {
+  //       return res.status(400).json({
+  //         status: 'error',
+  //         message: `${existingAuthCredential.userType} already exists with this email or phone`
+  //       });
+  //     }
       
-      // Convert time slots to schema format
-      const convertedOnlineSlots = this._convertTimeSlots(onlineConsultationTimeSlots);
-      const convertedOfflineSlots = this._convertTimeSlots(offlineConsultationTimeSlots);
+  //     // Convert time slots to schema format
+  //     const convertedOnlineSlots = this._convertTimeSlots(onlineConsultationTimeSlots);
+  //     const convertedOfflineSlots = this._convertTimeSlots(offlineConsultationTimeSlots);
 
-      // Create doctor with converted time slots
-      const doctor = await Doctor.create({
-        name,
-        email,
-        phone,
-        profilePic,
-        digitalSignature,
-        gender,
-        specializations,
-        qualification,
-        medicalCouncilRegistrationNumber,
-        experienceYears,
-        languagesSpoken,
-        serviceTypes,
-        introduction,
-        onlineConsultationTimeSlots: convertedOnlineSlots,
-        offlineConsultationTimeSlots: convertedOfflineSlots,
-        offlineAddress,
-        areas
-      });
+  //     // Create doctor with converted time slots
+  //     const doctor = await Doctor.create({
+  //       name,
+  //       email,
+  //       phone,
+  //       profilePic,
+  //       digitalSignature,
+  //       gender,
+  //       specializations,
+  //       qualification,
+  //       medicalCouncilRegistrationNumber,
+  //       experienceYears,
+  //       languagesSpoken,
+  //       serviceTypes,
+  //       introduction,
+  //       onlineConsultationTimeSlots: convertedOnlineSlots,
+  //       offlineConsultationTimeSlots: convertedOfflineSlots,
+  //       offlineAddress,
+  //       areas
+  //     });
 
-      //create a auth credential for the navigator
-      const authCredential = await AuthCredential.create({
-        userId: doctor._id,
-        email,
-        phoneNumber: phone,
-        phone,
-        password: null,
-        userType: 'doctor',
-        temporaryPassword: {
-          password: null,
-          expiresAt: null
-        },
+  //     // //create a auth credential for the navigator
+  //     // const authCredential = await AuthCredential.create({
+  //     //   userId: doctor._id,
+  //     //   email,
+  //     //   phoneNumber: phone,
+  //     //   phone,
+  //     //   password: null,
+  //     //   userType: 'doctor',
+  //     //   temporaryPassword: {
+  //     //     password: null,
+  //     //     expiresAt: null
+  //     //   },
         
-        isFirstLogin: true,
-        passwordResetRequired: true
-      });
+  //     //   isFirstLogin: true,
+  //     //   passwordResetRequired: true
+  //     // });
 
-      await authCredential.save();
+  //     // await authCredential.save();
 
-      //send welcome email to the doctor
-       const toObj = {
-        name: name,
-        email: email
-       }
-       emailService.sendEmail('welcome', toObj, {
-        number: phone,
-        name: name
-       });
+  //     // //send welcome email to the doctor
+  //     //  const toObj = {
+  //     //   name: name,
+  //     //   email: email
+  //     //  }
+  //     //  emailService.sendEmail('welcome', toObj, {
+  //     //   number: phone,
+  //     //   name: name
+  //     //  });
+
+  //     // after doctor is created
+  //     // const rawName = name.replace(/\s+/g, "");
+  //     // const namePart = rawName.substring(0, 4).toUpperCase();
+
+  //     // // extract birth year from dob (if exists)
+  //     // let birthYear = "";
+  //     // if (req.body.dob) {
+  //     //   const dobDate = new Date(req.body.dob);
+  //     //   if (!isNaN(dobDate)) {
+  //     //     birthYear = dobDate.getFullYear().toString();
+  //     //   }
+  //     // }
+
+  //     // // generate deterministic password
+  //     // const rawPassword = birthYear
+  //     //   ? `${namePart}@${birthYear}`
+  //     //   : `${namePart}@`;
+
+  //     // const hashedPassword = await bcrypt.hash(rawPassword, 12);
+
+  //     const rawName = name.replace(/\s+/g, "");
+  //     const namePart = rawName.substring(0, 4).toUpperCase();
+
+  //     // extract last 3 digits from doctorId
+  //     let last3 = "";
+
+  //     if (doctor.doctorId && doctor.doctorId.length >= 3) {
+  //       last3 = doctor.doctorId.slice(-3);
+  //     }
+
+  //     // generate password
+  //     const rawPassword = last3
+  //       ? `${namePart}@${last3}`
+  //       : `${namePart}@`;
+
+  //     const hashedPassword = await bcrypt.hash(rawPassword, 12);
+
+  //     // create auth credential
+  //     const authCredential = await AuthCredential.create({
+  //       userId: doctor._id,
+  //       email,
+  //       phoneNumber: phone,
+  //       userType: "doctor",
+
+  //       password: hashedPassword,          // ✅ real password
+  //       isFirstLogin: false,                 // ✅ force reset
+  //       passwordResetRequired: false         // ✅ force reset
+
+  //       // ❌ DO NOT SET temporaryPassword
+  //     });
+
+  //     await authCredential.save();
 
 
-      res.status(201).json({
-        status: 'success',
-        data: doctor
-      });
-    } catch (error) {
-      logger.error('Create doctor error:', error);
-      res.status(500).json({
+  //     await emailService.sendWelcomeDoctorMail({
+  //       toEmail: email,
+  //       name,
+  //       phone,
+  //       doctorId: doctor.doctorId
+  //     });
+
+
+  //     res.status(201).json({
+  //       status: 'success',
+  //       data: doctor
+  //     });
+  //   } catch (error) {
+  //     logger.error('Create doctor error:', error);
+  //     res.status(500).json({
+  //       status: 'error',
+  //       message: 'Error creating doctor',
+  //       details: error.message
+  //     });
+  //   }
+  // }
+  //17.1.26
+  async createDoctor(req, res) {
+  try {
+    const {
+      name,
+      email,
+      phone,
+      profilePic,
+      digitalSignature,
+      gender,
+      specializations = [],
+      qualification = [],
+      medicalCouncilRegistrationNumber,
+      experienceYears = 0,
+      languagesSpoken = [],
+      serviceTypes = ['online'],
+      introduction = '',
+      onlineConsultationTimeSlots = [],
+      offlineConsultationTimeSlots = [],
+      offlineAddress = {},
+      areas = [],
+      customSpeciality // 👈 from frontend
+    } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !phone || !medicalCouncilRegistrationNumber) {
+      return res.status(400).json({
         status: 'error',
-        message: 'Error creating doctor',
-        details: error.message
+        message: 'Name, email, phone, and medical council registration number are required'
       });
     }
+
+    if (gender && !['male', 'female', 'other'].includes(gender)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid gender value'
+      });
+    }
+
+    // Check if doctor already exists
+    const existingDoctor = await Doctor.findOne({
+      $or: [{ email }, { phone }]
+    });
+
+    if (existingDoctor) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Doctor already exists with this email or phone'
+      });
+    }
+
+    const existingAuthCredential = await AuthCredential.findOne({
+      $or: [{ email }, { phone }]
+    });
+
+    if (existingAuthCredential) {
+      return res.status(400).json({
+        status: 'error',
+        message: `${existingAuthCredential.userType} already exists with this email or phone`
+      });
+    }
+
+    // ================= SPECIALIZATION NORMALIZATION =================
+
+    let specializationIds = [];
+
+    // Normal selected IDs (exclude "other")
+    const normalIds = specializations.filter(id => id !== 'other');
+
+    // Handle "Others"
+    if (specializations.includes('other') && customSpeciality) {
+      const name = customSpeciality.trim();
+
+      let specialty = await AhSpecialty.findOne({
+        name: new RegExp(`^${name}$`, 'i')
+      });
+
+      if (!specialty) {
+        specialty = await AhSpecialty.create({ name });
+      }
+
+      specializationIds.push(specialty._id);
+    }
+
+    specializationIds = [...new Set([...normalIds, ...specializationIds])];
+
+    // ================================================================
+
+    const convertedOnlineSlots = this._convertTimeSlots(onlineConsultationTimeSlots);
+    const convertedOfflineSlots = this._convertTimeSlots(offlineConsultationTimeSlots);
+
+    const doctor = await Doctor.create({
+      name,
+      email,
+      phone,
+      profilePic,
+      digitalSignature,
+      gender,
+      specializations: specializationIds, // ✅ FIXED
+      qualification,
+      medicalCouncilRegistrationNumber,
+      experienceYears,
+      languagesSpoken,
+      serviceTypes,
+      introduction,
+      onlineConsultationTimeSlots: convertedOnlineSlots,
+      offlineConsultationTimeSlots: convertedOfflineSlots,
+      offlineAddress,
+      areas
+    });
+
+    // ================= PASSWORD + AUTH =================
+
+    const rawName = name.replace(/\s+/g, "");
+    const namePart = rawName.substring(0, 4).toUpperCase();
+
+    let last3 = "";
+    if (doctor.doctorId && doctor.doctorId.length >= 3) {
+      last3 = doctor.doctorId.slice(-3);
+    }
+
+    const rawPassword = last3 ? `${namePart}@${last3}` : `${namePart}@`;
+    const hashedPassword = await bcrypt.hash(rawPassword, 12);
+
+    const authCredential = await AuthCredential.create({
+      userId: doctor._id,
+      email,
+      phoneNumber: phone,
+      userType: "doctor",
+      password: hashedPassword,
+      isFirstLogin: false,
+      passwordResetRequired: false
+    });
+
+    await authCredential.save();
+
+    await emailService.sendWelcomeDoctorMail({
+      toEmail: email,
+      name,
+      phone,
+      doctorId: doctor.doctorId
+    });
+
+    res.status(201).json({
+      status: 'success',
+      data: doctor
+    });
+
+  } catch (error) {
+    logger.error('Create doctor error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error creating doctor',
+      details: error.message
+    });
   }
+}
 
   /**
    * Get all doctors with filters and pagination
@@ -266,7 +486,15 @@ class DoctorController {
         });
       }
 
-      const doctors = await Doctor.paginate(query, options);
+      //const doctors = await Doctor.paginate(query, options);
+      const doctors = await Doctor.paginate(query, {
+      ...options,
+      populate: {
+        path: 'specializations',
+        select: 'name'
+      }
+    });
+
 
       res.json({
         status: 'success',
@@ -293,6 +521,10 @@ class DoctorController {
   async getDoctor(req, res) {
     try {
       const doctor = await Doctor.findById(req.params.id)
+      .populate({
+        path: 'specializations',
+        select: 'name'
+      })
         .populate({
           path: 'navigatorId',
           select: '_id name navigatorId profilePic',
@@ -344,115 +576,254 @@ class DoctorController {
   /**
    * Update doctor profile
    */
-  async updateDoctor(req, res) {
-    try {
-      const {
-        name,
-        email,
-        phone,
-        profilePic,
-        gender,
-        digitalSignature,
-        specializations,
-        qualification,
-        medicalCouncilRegistrationNumber,
-        experienceYears,
-        languagesSpoken,
-        serviceTypes,
-        introduction,
-        onlineConsultationTimeSlots,
-        offlineConsultationTimeSlots,
-        offlineAddress,
-        areas
-      } = req.body;
+  // async updateDoctor(req, res) {
+  //   try {
+  //     const {
+  //       name,
+  //       email,
+  //       phone,
+  //       profilePic,
+  //       gender,
+  //       digitalSignature,
+  //       specializations,
+  //       qualification,
+  //       medicalCouncilRegistrationNumber,
+  //       experienceYears,
+  //       languagesSpoken,
+  //       serviceTypes,
+  //       introduction,
+  //       onlineConsultationTimeSlots,
+  //       offlineConsultationTimeSlots,
+  //       offlineAddress,
+  //       areas
+  //     } = req.body;
 
-      const doctor = await Doctor.findById(req.params.id);
+  //     const doctor = await Doctor.findById(req.params.id);
 
-      if (!doctor) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Doctor not found'
-        });
-      }
+  //     if (!doctor) {
+  //       return res.status(404).json({
+  //         status: 'error',
+  //         message: 'Doctor not found'
+  //       });
+  //     }
 
-      // Check if email or phone is already in use
-      if (email || phone) {
-        const existingDoctor = await Doctor.findOne({
-          _id: { $ne: req.params.id },
-          $or: [
-            { email: email || doctor.email },
-            { phone: phone || doctor.phone }
-          ]
-        });
+  //     // Check if email or phone is already in use
+  //     if (email || phone) {
+  //       const existingDoctor = await Doctor.findOne({
+  //         _id: { $ne: req.params.id },
+  //         $or: [
+  //           { email: email || doctor.email },
+  //           { phone: phone || doctor.phone }
+  //         ]
+  //       });
 
-        if (existingDoctor) {
-          return res.status(400).json({
-            status: 'error',
-            message: 'Email or phone number already in use'
-          });
-        }
-      }
+  //       if (existingDoctor) {
+  //         return res.status(400).json({
+  //           status: 'error',
+  //           message: 'Email or phone number already in use'
+  //         });
+  //       }
+  //     }
 
-      const existingAuthCredential = await AuthCredential.findOne({
-        $or: [{ email }, { phone }]
-      });
+  //     const existingAuthCredential = await AuthCredential.findOne({
+  //       $or: [{ email }, { phone }]
+  //     });
 
-      if (existingAuthCredential) {
-        return res.status(400).json({
-          status: 'error',
-          message: `${existingAuthCredential.userType} already exists with this email or phone`
-        });
-      }
+  //     if (existingAuthCredential) {
+  //       return res.status(400).json({
+  //         status: 'error',
+  //         message: `${existingAuthCredential.userType} already exists with this email or phone`
+  //       });
+  //     }
 
-      const updateData = {
-        ...(name && { name }),
-        ...(email && { email }),
-        ...(phone && { phone }),
-        ...(gender && { gender }),
-        ...(profilePic && { profilePic }),
-        ...(digitalSignature && { digitalSignature }),
-        ...(specializations && { specializations }),
-        ...(qualification && { qualification }),
-        ...(medicalCouncilRegistrationNumber && { medicalCouncilRegistrationNumber }),
-        ...(experienceYears && { experienceYears }),
-        ...(languagesSpoken && { languagesSpoken }),
-        ...(serviceTypes && { serviceTypes }),
-        ...(introduction && { introduction }),
-        ...(offlineAddress && { offlineAddress }),
-        ...(areas && { areas })
-      };
+  //     const updateData = {
+  //       ...(name && { name }),
+  //       ...(email && { email }),
+  //       ...(phone && { phone }),
+  //       ...(gender && { gender }),
+  //       ...(profilePic && { profilePic }),
+  //       ...(digitalSignature && { digitalSignature }),
+  //       ...(specializations && { specializations }),
+  //       ...(qualification && { qualification }),
+  //       ...(medicalCouncilRegistrationNumber && { medicalCouncilRegistrationNumber }),
+  //       ...(experienceYears && { experienceYears }),
+  //       ...(languagesSpoken && { languagesSpoken }),
+  //       ...(serviceTypes && { serviceTypes }),
+  //       ...(introduction && { introduction }),
+  //       ...(offlineAddress && { offlineAddress }),
+  //       ...(areas && { areas })
+  //     };
 
-      // Convert time slots if provided
-      if (onlineConsultationTimeSlots) {
-        updateData.onlineConsultationTimeSlots = this._convertTimeSlots(onlineConsultationTimeSlots);
-      }
-      if (offlineConsultationTimeSlots) {
-        updateData.offlineConsultationTimeSlots = this._convertTimeSlots(offlineConsultationTimeSlots);
-      }
+  //     // Convert time slots if provided
+  //     if (onlineConsultationTimeSlots) {
+  //       updateData.onlineConsultationTimeSlots = this._convertTimeSlots(onlineConsultationTimeSlots);
+  //     }
+  //     if (offlineConsultationTimeSlots) {
+  //       updateData.offlineConsultationTimeSlots = this._convertTimeSlots(offlineConsultationTimeSlots);
+  //     }
 
-      const updatedDoctor = await Doctor.findByIdAndUpdate(
-        req.params.id,
-        updateData,
-        { new: true }
-      );
+  //     const updatedDoctor = await Doctor.findByIdAndUpdate(
+  //       req.params.id,
+  //       updateData,
+  //       { new: true }
+  //     );
 
-      // Convert time slots back to payload format for response
-      const responseData = updatedDoctor.toObject();
-      responseData.onlineConsultationTimeSlots = this._convertTimeSlotsToPayload(updatedDoctor.onlineConsultationTimeSlots);
-      responseData.offlineConsultationTimeSlots = this._convertTimeSlotsToPayload(updatedDoctor.offlineConsultationTimeSlots);
+  //     // Convert time slots back to payload format for response
+  //     const responseData = updatedDoctor.toObject();
+  //     responseData.onlineConsultationTimeSlots = this._convertTimeSlotsToPayload(updatedDoctor.onlineConsultationTimeSlots);
+  //     responseData.offlineConsultationTimeSlots = this._convertTimeSlotsToPayload(updatedDoctor.offlineConsultationTimeSlots);
 
-      res.json({
-        status: 'success',
-        data: responseData
-      });
-    } catch (error) {
-      logger.error('Update doctor error:', error);
-      res.status(500).json({
+  //     res.json({
+  //       status: 'success',
+  //       data: responseData
+  //     });
+  //   } catch (error) {
+  //     logger.error('Update doctor error:', error);
+  //     res.status(500).json({
+  //       status: 'error',
+  //       message: 'Error updating doctor'
+  //     });
+  //   }
+  // }
+   //17.1.26
+   async updateDoctor(req, res) {
+  try {
+    const {
+      name,
+      email,
+      phone,
+      profilePic,
+      gender,
+      digitalSignature,
+      specializations,
+      qualification,
+      medicalCouncilRegistrationNumber,
+      experienceYears,
+      languagesSpoken,
+      serviceTypes,
+      introduction,
+      onlineConsultationTimeSlots,
+      offlineConsultationTimeSlots,
+      offlineAddress,
+      areas,
+      customSpeciality // 👈 from frontend
+    } = req.body;
+
+    const doctor = await Doctor.findById(req.params.id);
+
+    if (!doctor) {
+      return res.status(404).json({
         status: 'error',
-        message: 'Error updating doctor'
+        message: 'Doctor not found'
       });
     }
+
+    // Email / phone check
+    // if (email || phone) {
+    //   const existingDoctor = await Doctor.findOne({
+    //     _id: { $ne: req.params.id },
+    //     $or: [
+    //       { email: email || doctor.email },
+    //       { phone: phone || doctor.phone }
+    //     ]
+    //   });
+
+    //   if (existingDoctor) {
+    //     return res.status(400).json({
+    //       status: 'error',
+    //       message: 'Email or phone number already in use'
+    //     });
+    //   }
+    // }
+
+    // const existingAuthCredential = await AuthCredential.findOne({
+    //   $or: [{ email }, { phone }]
+    // });
+
+    // if (existingAuthCredential) {
+    //   return res.status(400).json({
+    //     status: 'error',
+    //     message: `${existingAuthCredential.userType} already exists with this email or phone`
+    //   });
+    // }
+
+    const updateData = {
+      ...(name && { name }),
+      ...(email && { email }),
+      ...(phone && { phone }),
+      ...(gender && { gender }),
+      ...(profilePic && { profilePic }),
+      ...(digitalSignature && { digitalSignature }),
+      ...(qualification && { qualification }),
+      ...(medicalCouncilRegistrationNumber && { medicalCouncilRegistrationNumber }),
+      ...(experienceYears && { experienceYears }),
+      ...(languagesSpoken && { languagesSpoken }),
+      ...(serviceTypes && { serviceTypes }),
+      ...(introduction && { introduction }),
+      ...(offlineAddress && { offlineAddress }),
+      ...(areas && { areas })
+    };
+
+    // ================= SPECIALIZATION NORMALIZATION =================
+
+    if (specializations) {
+      let specializationIds = [];
+
+      const normalIds = specializations.filter(id => id !== 'other');
+
+      if (specializations.includes('other') && customSpeciality) {
+        const name = customSpeciality.trim();
+
+        let specialty = await AhSpecialty.findOne({
+          name: new RegExp(`^${name}$`, 'i')
+        });
+
+        if (!specialty) {
+          specialty = await AhSpecialty.create({ name });
+        }
+
+        specializationIds.push(specialty._id);
+      }
+
+      specializationIds = [...new Set([...normalIds, ...specializationIds])];
+      updateData.specializations = specializationIds; // ✅ FIXED
+    }
+
+    // ================================================================
+
+    if (onlineConsultationTimeSlots) {
+      updateData.onlineConsultationTimeSlots = this._convertTimeSlots(onlineConsultationTimeSlots);
+    }
+
+    if (offlineConsultationTimeSlots) {
+      updateData.offlineConsultationTimeSlots = this._convertTimeSlots(offlineConsultationTimeSlots);
+    }
+
+    const updatedDoctor = await Doctor.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    );
+
+    const responseData = updatedDoctor.toObject();
+    responseData.onlineConsultationTimeSlots =
+      this._convertTimeSlotsToPayload(updatedDoctor.onlineConsultationTimeSlots);
+    responseData.offlineConsultationTimeSlots =
+      this._convertTimeSlotsToPayload(updatedDoctor.offlineConsultationTimeSlots);
+
+    res.json({
+      status: 'success',
+      data: responseData
+    });
+
+  } catch (error) {
+    logger.error('Update doctor error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error updating doctor'
+    });
   }
+}
 
   /**
    * Get doctor's appointments
@@ -686,33 +1057,69 @@ class DoctorController {
 
   async getDoctorStats(req, res) {
     try {
+      // let userId = req.user.userId;
+      // const doctor = await Doctor.findById(userId);
+      // if (!doctor) {
+      //   return res.status(404).json({
+      //     status: 'error',
+      //     message: 'Doctor not found'
+      //   });
+      // }
+      // const doctorId = doctor._id;
+
+      // const stats = {
+      //   totalMembers: await Member.countDocuments({ active: true }),
+      //   totalNavigators: await Navigator.countDocuments({ }),
+      //   recentAppointments: await Appointment.find({ doctorId }).sort({ appointmentDateTime: -1 }).limit(5),
+      //   totalAppointments: await Appointment.countDocuments({ doctorId }),
+      // };
+      // let upcomingAppointments = await Appointment.find({ doctorId, appointmentDateTime: { $gt: new Date() } }).sort({ appointmentDateTime: 1 }).limit(5);
+      // let todayAppointments = await Appointment.find({ doctorId, appointmentDateTime: { $gte: new Date(), $lt: new Date(new Date().setDate(new Date().getDate() + 1)) } }).sort({ appointmentDateTime: 1 }).populate('memberId', 'name email phone');
+
+      // res.json({
+      //   status: 'success',
+      //   data: {
+      //     stats,
+      //     upcomingAppointments,
+      //     todayAppointments
+      //   }
+      // });
       let userId = req.user.userId;
-      const doctor = await Doctor.findById(userId);
-      if (!doctor) {
-        return res.status(404).json({
-          status: 'error',
-          message: 'Doctor not found'
-        });
-      }
-      const doctorId = doctor._id;
-
-      const stats = {
-        totalMembers: await Member.countDocuments({ active: true }),
-        totalNavigators: await Navigator.countDocuments({ }),
-        recentAppointments: await Appointment.find({ doctorId }).sort({ appointmentDateTime: -1 }).limit(5),
-        totalAppointments: await Appointment.countDocuments({ doctorId }),
-      };
-      let upcomingAppointments = await Appointment.find({ doctorId, appointmentDateTime: { $gt: new Date() } }).sort({ appointmentDateTime: 1 }).limit(5);
-      let todayAppointments = await Appointment.find({ doctorId, appointmentDateTime: { $gte: new Date(), $lt: new Date(new Date().setDate(new Date().getDate() + 1)) } }).sort({ appointmentDateTime: 1 }).populate('memberId', 'name email phone');
-
-      res.json({
-        status: 'success',
-        data: {
-          stats,
-          upcomingAppointments,
-          todayAppointments
-        }
-      });
+            console.log(`userId: ${userId}`);
+            let userType = req.user.userType;
+            console.log(`userType: ${userType}`);
+            let stats, members, doctors, appointments, pending, ongoing, completed, newMembers;
+            if(userType === 'doctor') {
+              members = await Member.find({isStudent: false, 'healthcareTeam.doctor._id': new mongoose.Types.ObjectId(userId)}).countDocuments();
+            //  doctors = await Doctor.find({navigatorId: new mongoose.Types.ObjectId(userId)}).countDocuments();
+              appointments = await Appointment.find({doctorId: new mongoose.Types.ObjectId(userId)}).countDocuments();
+              pending = await Appointment.find({doctorId: new mongoose.Types.ObjectId(userId), status: 'pending'}).countDocuments();
+              ongoing = await Appointment.find({doctorId: new mongoose.Types.ObjectId(userId), status: 'ongoing'}).countDocuments();
+              completed = await Appointment.find({doctorId: new mongoose.Types.ObjectId(userId), status: 'completed'}).countDocuments();
+              newMembers = await Member.find({
+                isStudent: false,
+                $or: [
+                  { 'healthcareTeam.doctor': { $exists: false } },
+                  { 'healthcareTeam.doctor': null },
+                  { 'healthcareTeam.doctor._id': { $exists: false } }
+                ]
+              }).countDocuments();
+            }
+             
+            stats = {
+              members,
+              doctors,
+              appointments,
+              pending,
+              ongoing,
+              completed,
+              newMembers
+            };
+      
+            res.json({
+              status: 'success',
+              data: stats
+            });
     } catch (error) {
       logger.error('Get doctor stats error:', error);
       res.status(500).json({
